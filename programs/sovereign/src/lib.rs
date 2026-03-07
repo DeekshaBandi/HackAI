@@ -338,7 +338,7 @@ pub struct ClaimTerritory<'info> {
         init,
         payer = authority,
         space = 8 + Territory::INIT_SPACE,
-        seeds = [b"territory", &x.to_le_bytes(), &y.to_le_bytes()],
+        seeds = [b"territory", x.to_le_bytes().as_ref(), y.to_le_bytes().as_ref()],
         bump
     )]
     pub territory: Account<'info, Territory>,
