@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{self, Mint, MintTo, Token, TokenAccount},
@@ -13,6 +14,8 @@ pub const MAX_COLOR_LEN: usize = 7; // "#RRGGBB"
 pub const INITIAL_TREASURY: u64 = 1_000_000_000_000; // 1M tokens (6 decimals)
 pub const TERRITORY_BASE_POWER: u64 = 10;
 pub const STARTING_MILITARY: u64 = 100;
+pub const MAX_DESCRIPTION_LEN: usize = 256;
+pub const MAX_WORK_URL_LEN: usize = 200;
 
 // ─── Program ──────────────────────────────────────────────────────────────────
 #[program]
@@ -217,6 +220,159 @@ pub mod sovereign {
             winner_name,
             clock.slot.saturating_sub(battle.started_slot),
         );
+        Ok(())
+    }
+
+    // ─── Bounty Instructions ──────────────────────────────────────────────────
+
+    /// Create a new bounty. Creator deposits SOL into the bounty PDA (escrow).
+    ///
+    /// BountyState PDA: ["bounty_state", creator]  — tracks creator's bounty count
+    /// Bounty PDA:      ["bounty", creator, index_bytes]
+    pub fn create_bounty(
+        ctx: Context<CreateBounty>,
+        amount: u64,
+        description: String,
+        deadline: i64,
+    ) -> Result<()> {
+        require!(amount > 0, BountyError::InvalidAmount);
+        require!(!description.is_empty(), BountyError::EmptyDescription);
+        require!(
+            description.len() <= MAX_DESCRIPTION_LEN,
+            BountyError::DescriptionTooLong
+        );
+        require!(
+            deadline > Clock::get()?.unix_timestamp,
+            BountyError::DeadlineInPast
+        );
+
+        let state = &mut ctx.accounts.bounty_state;
+        let bounty_index = state.bounty_count;
+
+        let bounty = &mut ctx.accounts.bounty;
+        bounty.creator = ctx.accounts.creator.key();
+        bounty.claimant = Pubkey::default();
+        bounty.amount = amount;
+        bounty.status = BountyStatus::Open;
+        bounty.work_url = String::new();
+        bounty.description = description.clone();
+        bounty.deadline = deadline;
+        bounty.bounty_index = bounty_index;
+        bounty.bump = ctx.bumps.bounty;
+
+        state.bounty_count = bounty_index.checked_add(1).unwrap();
+
+        // Transfer bounty amount from creator to bounty PDA (escrow)
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.creator.to_account_info(),
+                    to: ctx.accounts.bounty.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        msg!(
+            "💰 Bounty #{} created by {} | Amount: {} lamports | '{}'",
+            bounty_index,
+            ctx.accounts.creator.key(),
+            amount,
+            description,
+        );
+        Ok(())
+    }
+
+    /// Submit work for an open bounty.
+    ///
+    /// Claimant provides a work URL (GitHub PR, Drive link, etc.)
+    /// Bounty status transitions Open → Submitted.
+    pub fn submit_work(
+        ctx: Context<SubmitWork>,
+        work_url: String,
+    ) -> Result<()> {
+        require!(
+            work_url.len() <= MAX_WORK_URL_LEN,
+            BountyError::WorkUrlTooLong
+        );
+        require!(!work_url.is_empty(), BountyError::EmptyWorkUrl);
+
+        let bounty = &mut ctx.accounts.bounty;
+        require!(bounty.status == BountyStatus::Open, BountyError::BountyNotOpen);
+        require!(
+            Clock::get()?.unix_timestamp <= bounty.deadline,
+            BountyError::BountyExpired
+        );
+        require!(
+            ctx.accounts.claimant.key() != bounty.creator,
+            BountyError::CreatorCannotClaim
+        );
+
+        bounty.claimant = ctx.accounts.claimant.key();
+        bounty.work_url = work_url.clone();
+        bounty.status = BountyStatus::Submitted;
+
+        msg!(
+            "📤 Work submitted for bounty #{} by {} | URL: {}",
+            bounty.bounty_index,
+            ctx.accounts.claimant.key(),
+            work_url,
+        );
+        Ok(())
+    }
+
+    /// Approve a submission and release escrowed funds to the claimant.
+    ///
+    /// Only callable by the bounty creator.
+    /// Bounty status transitions Submitted → Completed.
+    /// Bounty PDA is closed; rent returned to creator.
+    pub fn approve_submission(ctx: Context<ApproveSubmission>) -> Result<()> {
+        let bounty = &ctx.accounts.bounty;
+        require!(
+            bounty.status == BountyStatus::Submitted,
+            BountyError::NotSubmitted
+        );
+
+        let payout = bounty.amount;
+
+        // Transfer bounty amount from escrow (bounty PDA) to claimant
+        // Direct lamport manipulation — program owns the PDA
+        **ctx
+            .accounts
+            .bounty
+            .to_account_info()
+            .try_borrow_mut_lamports()? -= payout;
+        **ctx
+            .accounts
+            .claimant
+            .to_account_info()
+            .try_borrow_mut_lamports()? += payout;
+
+        msg!(
+            "✅ Bounty #{} approved | {} SOL released to {}",
+            bounty.bounty_index,
+            payout,
+            ctx.accounts.claimant.key(),
+        );
+        // Account closed by Anchor (close = creator) — rent returned to creator
+        Ok(())
+    }
+
+    /// Cancel an open bounty and reclaim escrowed funds.
+    ///
+    /// Only callable by the creator while status is Open (no submission yet).
+    /// Bounty PDA is closed; all lamports (amount + rent) returned to creator.
+    pub fn cancel_bounty(ctx: Context<CancelBounty>) -> Result<()> {
+        let bounty = &ctx.accounts.bounty;
+        require!(bounty.status == BountyStatus::Open, BountyError::BountyNotOpen);
+
+        msg!(
+            "❌ Bounty #{} cancelled by {}",
+            bounty.bounty_index,
+            ctx.accounts.creator.key(),
+        );
+        // Account closed by Anchor (close = creator) — all lamports returned
         Ok(())
     }
 
@@ -443,6 +599,105 @@ pub struct MintProduction<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+// ─── Bounty Account Contexts ──────────────────────────────────────────────────
+
+#[derive(Accounts)]
+pub struct CreateBounty<'info> {
+    /// BountyState PDA — tracks how many bounties this creator has made
+    #[account(
+        init_if_needed,
+        payer = creator,
+        space = 8 + BountyState::INIT_SPACE,
+        seeds = [b"bounty_state", creator.key().as_ref()],
+        bump,
+    )]
+    pub bounty_state: Account<'info, BountyState>,
+
+    /// Bounty PDA — unique per creator + index
+    #[account(
+        init,
+        payer = creator,
+        space = 8 + Bounty::INIT_SPACE,
+        seeds = [
+            b"bounty",
+            creator.key().as_ref(),
+            &bounty_state.bounty_count.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub bounty: Account<'info, Bounty>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitWork<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"bounty",
+            bounty.creator.as_ref(),
+            &bounty.bounty_index.to_le_bytes(),
+        ],
+        bump = bounty.bump,
+    )]
+    pub bounty: Account<'info, Bounty>,
+
+    pub claimant: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ApproveSubmission<'info> {
+    #[account(
+        mut,
+        has_one = creator @ BountyError::NotBountyCreator,
+        seeds = [
+            b"bounty",
+            bounty.creator.as_ref(),
+            &bounty.bounty_index.to_le_bytes(),
+        ],
+        bump = bounty.bump,
+        close = creator,
+    )]
+    pub bounty: Account<'info, Bounty>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    /// CHECK: verified via bounty.claimant
+    #[account(
+        mut,
+        constraint = claimant.key() == bounty.claimant @ BountyError::WrongClaimant
+    )]
+    pub claimant: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelBounty<'info> {
+    #[account(
+        mut,
+        has_one = creator @ BountyError::NotBountyCreator,
+        seeds = [
+            b"bounty",
+            bounty.creator.as_ref(),
+            &bounty.bounty_index.to_le_bytes(),
+        ],
+        bump = bounty.bump,
+        close = creator,
+    )]
+    pub bounty: Account<'info, Bounty>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 #[account]
@@ -483,6 +738,40 @@ pub struct Territory {
     pub bump: u8,
 }
 
+// ─── Bounty State ─────────────────────────────────────────────────────────────
+
+#[account]
+#[derive(InitSpace)]
+pub struct BountyState {
+    pub creator: Pubkey,
+    pub bounty_count: u64,
+    pub bump: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, InitSpace)]
+pub enum BountyStatus {
+    Open,
+    Submitted,
+    Completed,
+    Cancelled,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Bounty {
+    pub creator: Pubkey,
+    pub claimant: Pubkey,   // Pubkey::default() until claimed
+    pub amount: u64,         // prize in lamports (held in this PDA as escrow)
+    pub status: BountyStatus,
+    #[max_len(200)]
+    pub work_url: String,
+    #[max_len(256)]
+    pub description: String,
+    pub deadline: i64,       // unix timestamp
+    pub bounty_index: u64,   // index within this creator's bounties
+    pub bump: u8,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct Battle {
@@ -499,6 +788,38 @@ pub struct Battle {
 }
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
+
+// ─── Bounty Errors ────────────────────────────────────────────────────────────
+
+#[error_code]
+pub enum BountyError {
+    #[msg("Bounty amount must be greater than zero")]
+    InvalidAmount,
+    #[msg("Description cannot be empty")]
+    EmptyDescription,
+    #[msg("Description exceeds 256 characters")]
+    DescriptionTooLong,
+    #[msg("Deadline must be in the future")]
+    DeadlineInPast,
+    #[msg("Work URL cannot be empty")]
+    EmptyWorkUrl,
+    #[msg("Work URL exceeds 200 characters")]
+    WorkUrlTooLong,
+    #[msg("Bounty is not open for claims")]
+    BountyNotOpen,
+    #[msg("Bounty has expired past its deadline")]
+    BountyExpired,
+    #[msg("Creator cannot claim their own bounty")]
+    CreatorCannotClaim,
+    #[msg("Bounty has not been submitted yet")]
+    NotSubmitted,
+    #[msg("Only the bounty creator can perform this action")]
+    NotBountyCreator,
+    #[msg("Claimant does not match bounty record")]
+    WrongClaimant,
+}
+
+// ─── Sovereign Errors ─────────────────────────────────────────────────────────
 
 #[error_code]
 pub enum SovereignError {

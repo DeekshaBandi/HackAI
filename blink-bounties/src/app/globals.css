@@ -1,0 +1,57 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --border: #2a2d3a;
+  --accent: #9945ff;
+  --accent-hover: #b366ff;
+  --green: #14f195;
+  --red: #ff4444;
+  --yellow: #f5a623;
+  --text: #e8eaed;
+  --text-muted: #8b8fa8;
+  --radius: 12px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+/* Wallet adapter button override */
+.wallet-adapter-button {
+  background: var(--accent) !important;
+  border-radius: var(--radius) !important;
+}
+
+.wallet-adapter-button:hover {
+  background: var(--accent-hover) !important;
+}
