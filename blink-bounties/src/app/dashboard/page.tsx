@@ -16,10 +16,9 @@ export default function DashboardPage() {
         }}
       >
         <div>
-          <h1 style={{ marginBottom: "0.25rem" }}>My Bounties</h1>
+          <h1 style={{ marginBottom: "0.25rem" }}>Bounty Dashboard</h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-            All bounties you have created. Approve submissions or cancel to
-            reclaim funds.
+            Manage your posted bounties and discover new ones to claim.
           </p>
         </div>
       </div>
