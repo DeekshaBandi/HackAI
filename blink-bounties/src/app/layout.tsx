@@ -21,7 +21,7 @@ export default function RootLayout({
           <Navbar />
           <main
             style={{
-              maxWidth: 900,
+              maxWidth: 1200,
               margin: "0 auto",
               padding: "2rem 1rem",
             }}
