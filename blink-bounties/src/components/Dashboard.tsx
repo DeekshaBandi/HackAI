@@ -101,6 +101,52 @@ const STATUS_CONFIG: Record<
   },
 };
 
+// ─── CSS injected once ────────────────────────────────────────────────────────
+
+const CARD_CSS = `
+.bb-card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a3e;
+  border-radius: 16px;
+  padding: 1.25rem 1.4rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.bb-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.bb-btn-claim {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+  transition: opacity 0.15s;
+}
+.bb-btn-claim:hover { opacity: 0.85; }
+.bb-btn-view {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  background: #16213e;
+  color: #a78bfa;
+  border: 1px solid #312e81;
+  transition: opacity 0.15s;
+}
+.bb-btn-view:hover { opacity: 0.85; }
+`;
+
 // ─── BountyCard ───────────────────────────────────────────────────────────────
 
 function BountyCard({
@@ -113,29 +159,7 @@ function BountyCard({
   const s = STATUS_CONFIG[bounty.status];
 
   return (
-    <div
-      style={{
-        background: "#1a1a2e",
-        border: "1px solid #2a2a3e",
-        borderRadius: 16,
-        padding: "1.25rem 1.4rem",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.85rem",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-        (e.currentTarget as HTMLDivElement).style.boxShadow =
-          "0 8px 32px rgba(0,0,0,0.5)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-        (e.currentTarget as HTMLDivElement).style.boxShadow =
-          "0 4px 24px rgba(0,0,0,0.35)";
-      }}
-    >
+    <div className="bb-card">
       {/* Top row: status badge + reward */}
       <div
         style={{
@@ -211,44 +235,15 @@ function BountyCard({
           color: "#64748b",
         }}
       >
-        <span style={{ fontSize: "0.9rem" }}>🕐</span>
+        <span style={{ fontSize: "0.9rem" }}>&#x1F550;</span>
         {bounty.deadline}
       </div>
 
       {/* Divider */}
-      <div
-        style={{ height: 1, background: "#2a2a3e", margin: "0 -0.1rem" }}
-      />
+      <div style={{ height: 1, background: "#2a2a3e" }} />
 
       {/* Action button */}
-      <button
-        style={{
-          width: "100%",
-          padding: "0.6rem 1rem",
-          borderRadius: 10,
-          fontWeight: 700,
-          fontSize: "0.875rem",
-          cursor: "pointer",
-          border: "none",
-          transition: "opacity 0.15s",
-          ...(variant === "available"
-            ? {
-                background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                color: "#fff",
-              }
-            : {
-                background: "#16213e",
-                color: "#a78bfa",
-                border: "1px solid #312e81",
-              }),
-        }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLButtonElement).style.opacity = "0.85")
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLButtonElement).style.opacity = "1")
-        }
-      >
+      <button className={variant === "available" ? "bb-btn-claim" : "bb-btn-view"}>
         {variant === "available" ? "Claim Bounty" : "View Submission"}
       </button>
     </div>
@@ -315,46 +310,49 @@ function SectionHeader({
 
 export default function Dashboard() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "3rem" }}>
-      {/* My Posted Bounties */}
-      <section>
-        <SectionHeader
-          title="My Posted Bounties"
-          count={MY_BOUNTIES.length}
-          accent="#7c3aed"
-        />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "1.1rem",
-          }}
-        >
-          {MY_BOUNTIES.map((b) => (
-            <BountyCard key={b.id} bounty={b} variant="posted" />
-          ))}
-        </div>
-      </section>
+    <>
+      <style>{CARD_CSS}</style>
+      <div style={{ display: "flex", flexDirection: "column", gap: "3rem" }}>
+        {/* My Posted Bounties */}
+        <section>
+          <SectionHeader
+            title="My Posted Bounties"
+            count={MY_BOUNTIES.length}
+            accent="#7c3aed"
+          />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: "1.1rem",
+            }}
+          >
+            {MY_BOUNTIES.map((b) => (
+              <BountyCard key={b.id} bounty={b} variant="posted" />
+            ))}
+          </div>
+        </section>
 
-      {/* Available Bounties */}
-      <section>
-        <SectionHeader
-          title="Available Bounties"
-          count={AVAILABLE_BOUNTIES.length}
-          accent="#4f46e5"
-        />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "1.1rem",
-          }}
-        >
-          {AVAILABLE_BOUNTIES.map((b) => (
-            <BountyCard key={b.id} bounty={b} variant="available" />
-          ))}
-        </div>
-      </section>
-    </div>
+        {/* Available Bounties */}
+        <section>
+          <SectionHeader
+            title="Available Bounties"
+            count={AVAILABLE_BOUNTIES.length}
+            accent="#4f46e5"
+          />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: "1.1rem",
+            }}
+          >
+            {AVAILABLE_BOUNTIES.map((b) => (
+              <BountyCard key={b.id} bounty={b} variant="available" />
+            ))}
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
