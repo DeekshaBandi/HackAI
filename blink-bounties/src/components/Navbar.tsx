@@ -1,61 +1,59 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
-const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/create", label: "+ Create Bounty" },
-  { href: "/dashboard", label: "Dashboard" },
-];
-
 export default function Navbar() {
-  const pathname = usePathname();
-
   return (
-    <nav
+    <header
       style={{
-        background: "var(--surface)",
-        borderBottom: "1px solid var(--border)",
-        padding: "0 1.5rem",
+        padding: "0 32px",
+        borderBottom: "1px solid #1a1a2e",
         display: "flex",
-        alignItems: "center",
         justifyContent: "space-between",
+        alignItems: "center",
         height: 64,
+        background: "#0a0a0f",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-        <Link
-          href="/"
+      {/* Logo */}
+      <div>
+        <div
           style={{
-            fontWeight: 700,
-            fontSize: "1.1rem",
-            color: "var(--accent)",
+            fontFamily: "'Syne', sans-serif",
+            fontSize: "22px",
+            fontWeight: 800,
+            letterSpacing: "-0.5px",
+            color: "#fff",
           }}
         >
-          💰 Blink Bounties
-        </Link>
-
-        <div style={{ display: "flex", gap: "1.5rem" }}>
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              style={{
-                fontSize: "0.9rem",
-                color:
-                  pathname === link.href ? "var(--text)" : "var(--text-muted)",
-                fontWeight: pathname === link.href ? 600 : 400,
-              }}
-            >
-              {link.label}
-            </Link>
-          ))}
+          &#x26A1; FlashDrop
+        </div>
+        <div style={{ fontSize: "11px", color: "#555", marginTop: 1 }}>
+          Real-time art drops on Solana
         </div>
       </div>
 
-      <WalletMultiButton />
-    </nav>
+      {/* Right side */}
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div
+          style={{
+            fontSize: "12px",
+            color: "#a855f7",
+            background: "#1a0a2e",
+            padding: "6px 14px",
+            borderRadius: 20,
+            border: "1px solid rgba(168,85,247,0.2)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <span className="fd-pulse fd-dot" />
+          Devnet
+        </div>
+
+        <WalletMultiButton />
+      </div>
+    </header>
   );
 }

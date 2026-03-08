@@ -4,9 +4,8 @@ import SolanaWalletProvider from "@/components/WalletProvider";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "Blink Bounties",
-  description:
-    "Post and claim on-chain bounties on Solana. Shareable as Blinks.",
+  title: "FlashDrop",
+  description: "Real-time art drops on Solana. Buy NFTs directly inside X.",
 };
 
 export default function RootLayout({
@@ -16,18 +15,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <SolanaWalletProvider>
           <Navbar />
-          <main
-            style={{
-              maxWidth: 1200,
-              margin: "0 auto",
-              padding: "2rem 1rem",
-            }}
-          >
-            {children}
-          </main>
+          <main>{children}</main>
         </SolanaWalletProvider>
       </body>
     </html>

@@ -7,23 +7,24 @@
 }
 
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --border: #2a2d3a;
-  --accent: #9945ff;
-  --accent-hover: #b366ff;
-  --green: #14f195;
-  --red: #ff4444;
-  --yellow: #f5a623;
-  --text: #e8eaed;
-  --text-muted: #8b8fa8;
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a2e;
+  --border: #1e1e30;
+  --accent: #a855f7;
+  --accent-hover: #c084fc;
+  --pink: #ec4899;
+  --green: #4ade80;
+  --red: #ef4444;
+  --text: #ffffff;
+  --text-muted: #666;
   --radius: 12px;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
 }
 
@@ -48,67 +49,134 @@ textarea {
 
 /* Wallet adapter button override */
 .wallet-adapter-button {
-  background: var(--accent) !important;
-  border-radius: var(--radius) !important;
+  background: linear-gradient(135deg, #a855f7, #ec4899) !important;
+  border-radius: 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
 }
 
 .wallet-adapter-button:hover {
-  background: var(--accent-hover) !important;
+  opacity: 0.85 !important;
 }
 
-/* ── Marketplace bounty cards ─────────────────────────────────────────────── */
+/* ── Shared animations ────────────────────────────────────────────────────── */
 
-.mp-card {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+@keyframes fd-pulse-anim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.fd-pulse {
+  animation: fd-pulse-anim 2s infinite;
+}
+
+.fd-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── Drop cards ───────────────────────────────────────────────────────────── */
+
+.fd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 1.25rem 1.4rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  transition: transform 0.15s ease, box-shadow 0.15s ease,
-    border-color 0.15s ease;
-}
-.mp-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
-  border-color: #3a3d4e;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-.mp-btn-claim {
+.fd-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.fd-buy-btn {
   width: 100%;
-  padding: 0.6rem 1rem;
+  padding: 10px;
   border-radius: 10px;
-  font-weight: 700;
-  font-size: 0.875rem;
-  cursor: pointer;
   border: none;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  background: linear-gradient(135deg, #a855f7, #ec4899);
   color: #fff;
-  transition: opacity 0.15s;
-}
-.mp-btn-claim:hover {
-  opacity: 0.85;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  font-family: inherit;
 }
 
-.mp-filter-tab {
-  padding: 0.45rem 1rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
+.fd-buy-btn:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.fd-buy-btn:disabled {
+  background: #1a1a2e;
+  color: #444;
+  cursor: not-allowed;
+}
+
+.fd-copy-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  font-family: inherit;
+}
+
+.fd-copy-btn:hover {
+  background: rgba(168, 85, 247, 0.08);
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+
+.fd-tab {
+  padding: 16px 0;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  border: 1px solid #2a2d3a;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  transition: color 0.2s;
+}
+
+.fd-tab:hover {
+  color: #aaa;
+}
+
+.fd-tab.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Post drop outline button ─────────────────────────────────────────────── */
+
+.fd-outline-btn {
   background: transparent;
-  color: #8b8fa8;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: var(--accent);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background 0.15s;
 }
-.mp-filter-tab:hover {
-  background: #1e2130;
-  color: #e8eaed;
-}
-.mp-filter-tab.active {
-  background: #2a1f4e;
-  color: #a78bfa;
-  border-color: #5b3db5;
+
+.fd-outline-btn:hover {
+  background: rgba(168, 85, 247, 0.08);
 }

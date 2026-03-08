@@ -1,189 +1,343 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type BountyStatus = "Open" | "Submitted" | "Completed";
-
-interface Bounty {
-  id: string;
+interface Drop {
+  id: number;
   title: string;
-  description: string;
-  reward: string;
-  status: BountyStatus;
-  deadline: string;
+  creator: string;
+  price: string;
+  editions: number;
+  claimed: number;
+  /** seconds remaining; 0 = sold out; -1 = perpetual / no timer */
+  secondsLeft: number;
+  gradient: [string, string];
+  emoji: string;
 }
 
-// ─── Bounty data ──────────────────────────────────────────────────────────────
+interface MyDrop {
+  id: number;
+  title: string;
+  price: string;
+  editions: number;
+  claimed: number;
+  earned: string;
+  gradient: [string, string];
+  emoji: string;
+}
 
-const BOUNTIES: Bounty[] = [
+// ─── Seed data ────────────────────────────────────────────────────────────────
+
+const INITIAL_DROPS: Drop[] = [
   {
-    id: "1",
-    title: "Fix login bug in React app",
-    description:
-      "Users are getting stuck on the OAuth callback screen. Need a clean fix that handles edge-case redirects.",
-    reward: "2 SOL",
-    status: "Open",
-    deadline: "Due in 3 days",
+    id: 1,
+    title: "Neon Samurai",
+    creator: "@darkwave.sol",
+    price: "0.5 SOL",
+    editions: 10,
+    claimed: 7,
+    secondsLeft: 272,
+    gradient: ["#7c3aed", "#ec4899"],
+    emoji: "⚔️",
   },
   {
-    id: "2",
-    title: "Integrate Solana Pay into checkout",
-    description:
-      "Add SOL and USDC payment options to an existing Next.js storefront using the Solana Pay SDK.",
-    reward: "3 SOL",
-    status: "Open",
-    deadline: "Due in 5 days",
+    id: 2,
+    title: "Cyber Lotus",
+    creator: "@flora.sol",
+    price: "0.2 SOL",
+    editions: 5,
+    claimed: 2,
+    secondsLeft: 730,
+    gradient: ["#0891b2", "#3b82f6"],
+    emoji: "🌸",
   },
   {
-    id: "3",
-    title: "Build a CSV export feature",
-    description:
-      "Let dashboard users export their analytics data as a downloadable CSV file with custom date ranges.",
-    reward: "75 USDC",
-    status: "Open",
-    deadline: "Due in 7 days",
+    id: 3,
+    title: "Desert Glitch",
+    creator: "@sand.sol",
+    price: "1.0 SOL",
+    editions: 3,
+    claimed: 3,
+    secondsLeft: 0,
+    gradient: ["#ea580c", "#ef4444"],
+    emoji: "🏜️",
   },
   {
-    id: "4",
-    title: "Build Discord bot for bounty notifications",
-    description:
-      "Create a Discord bot that posts new bounty announcements to a channel with formatted embeds and claim links.",
-    reward: "1 SOL",
-    status: "Open",
-    deadline: "Due in 10 days",
+    id: 4,
+    title: "Quantum Ghost",
+    creator: "@specter.sol",
+    price: "0.75 SOL",
+    editions: 8,
+    claimed: 1,
+    secondsLeft: 1800,
+    gradient: ["#7c3aed", "#0891b2"],
+    emoji: "👻",
   },
   {
-    id: "5",
-    title: "Write API documentation",
-    description:
-      "Document all REST endpoints for the project backend using OpenAPI 3.0 spec with request/response examples.",
-    reward: "30 USDC",
-    status: "Open",
-    deadline: "Due in 6 days",
+    id: 5,
+    title: "Sakura Rain",
+    creator: "@blossom.sol",
+    price: "0.3 SOL",
+    editions: 15,
+    claimed: 9,
+    secondsLeft: 420,
+    gradient: ["#db2777", "#f97316"],
+    emoji: "🌸",
   },
   {
-    id: "6",
-    title: "Write unit tests for payment module",
-    description:
-      "Cover the checkout flow with Jest tests — at least 80% coverage on the new Stripe integration.",
-    reward: "50 USDC",
-    status: "Submitted",
-    deadline: "Due in 1 day",
-  },
-  {
-    id: "7",
-    title: "Smart contract security review",
-    description:
-      "Audit a 400-line Anchor program for reentrancy, overflow, and authority-check vulnerabilities.",
-    reward: "5 SOL",
-    status: "Submitted",
-    deadline: "Due in 2 days",
-  },
-  {
-    id: "8",
-    title: "Design landing page mockup",
-    description:
-      "High-fidelity Figma mockup for the new marketing landing page, mobile-first with dark mode variants.",
-    reward: "1.5 SOL",
-    status: "Completed",
-    deadline: "Ended",
+    id: 6,
+    title: "Solar Punk",
+    creator: "@leaf.sol",
+    price: "0.4 SOL",
+    editions: 6,
+    claimed: 0,
+    secondsLeft: 3540,
+    gradient: ["#16a34a", "#0891b2"],
+    emoji: "🌿",
   },
 ];
 
-// ─── Status config ────────────────────────────────────────────────────────────
+const MY_DROPS: MyDrop[] = [
+  {
+    id: 7,
+    title: "Void Protocol",
+    price: "0.8 SOL",
+    editions: 8,
+    claimed: 5,
+    earned: "4.0 SOL",
+    gradient: ["#059669", "#0891b2"],
+    emoji: "🌀",
+  },
+  {
+    id: 8,
+    title: "Chrome Angel",
+    price: "0.3 SOL",
+    editions: 20,
+    claimed: 20,
+    earned: "6.0 SOL",
+    gradient: ["#d97706", "#ea580c"],
+    emoji: "👼",
+  },
+];
 
-const STATUS_CONFIG: Record<
-  BountyStatus,
-  { label: string; bg: string; color: string; border: string }
-> = {
-  Open: { label: "Open", bg: "#16a34a1a", color: "#16a34a", border: "#16a34a55" },
-  Submitted: { label: "Submitted", bg: "#ca8a041a", color: "#ca8a04", border: "#ca8a0455" },
-  Completed: { label: "Completed", bg: "#6b72801a", color: "#9ca3af", border: "#6b728055" },
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const FILTER_TABS = ["All", "Open", "Submitted", "Completed"] as const;
-type FilterTab = (typeof FILTER_TABS)[number];
+function fmtTime(s: number): string {
+  if (s <= 0) return "SOLD";
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
 
-// ─── BountyCard ───────────────────────────────────────────────────────────────
+// ─── LiveDropCard ─────────────────────────────────────────────────────────────
 
-function BountyCard({ bounty }: { bounty: Bounty }) {
-  const s = STATUS_CONFIG[bounty.status];
+function LiveDropCard({ drop }: { drop: Drop }) {
+  const soldOut = drop.secondsLeft === 0 || drop.claimed >= drop.editions;
+  const pct = (drop.claimed / drop.editions) * 100;
+  const timeLabel = soldOut ? "SOLD" : fmtTime(drop.secondsLeft);
+
   return (
-    <div className="mp-card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span
-          style={{
-            background: s.bg,
-            color: s.color,
-            border: `1px solid ${s.border}`,
-            borderRadius: 999,
-            padding: "0.2rem 0.75rem",
-            fontSize: "0.72rem",
-            fontWeight: 700,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-          }}
-        >
-          {s.label}
-        </span>
-        <span
-          style={{
-            fontWeight: 800,
-            fontSize: "1.05rem",
-            color: "#a78bfa",
-            letterSpacing: "-0.01em",
-          }}
-        >
-          {bounty.reward}
-        </span>
-      </div>
-
-      <p
-        style={{
-          fontWeight: 700,
-          fontSize: "1rem",
-          lineHeight: 1.35,
-          color: "#f1f5f9",
-          margin: 0,
-        }}
-      >
-        {bounty.title}
-      </p>
-
-      <p
-        style={{
-          fontSize: "0.85rem",
-          color: "#94a3b8",
-          lineHeight: 1.55,
-          margin: 0,
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-      >
-        {bounty.description}
-      </p>
-
+    <div className="fd-card">
+      {/* Art preview */}
       <div
         style={{
+          height: 180,
+          background: `linear-gradient(135deg, ${drop.gradient[0]}, ${drop.gradient[1]})`,
           display: "flex",
           alignItems: "center",
-          gap: "0.4rem",
-          fontSize: "0.78rem",
-          color: "#64748b",
+          justifyContent: "center",
+          fontSize: 64,
+          position: "relative",
         }}
       >
-        <span>&#x1F550;</span>
-        {bounty.deadline}
+        {drop.emoji}
+
+        {/* Timer / sold badge */}
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            background: "rgba(0,0,0,0.65)",
+            color: soldOut ? "#ef4444" : "#fff",
+            padding: "4px 10px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          {soldOut ? "SOLD OUT" : `⏱ ${timeLabel}`}
+        </div>
+
+        {/* Edition counter */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 12,
+            left: 12,
+            background: "rgba(0,0,0,0.65)",
+            color: "#fff",
+            padding: "4px 10px",
+            borderRadius: 6,
+            fontSize: 11,
+          }}
+        >
+          {drop.claimed}/{drop.editions} claimed
+        </div>
       </div>
 
-      <div style={{ height: 1, background: "#2a2d3a" }} />
+      {/* Body */}
+      <div style={{ padding: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 800,
+                fontSize: 16,
+              }}
+            >
+              {drop.title}
+            </div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+              {drop.creator}
+            </div>
+          </div>
+          <div style={{ fontWeight: 700, color: "#a855f7", fontSize: 15 }}>
+            {drop.price}
+          </div>
+        </div>
 
-      <button className="mp-btn-claim">Claim Bounty</button>
+        {/* Edition progress bar */}
+        <div
+          style={{
+            background: "#1a1a2e",
+            borderRadius: 4,
+            height: 4,
+            marginBottom: 14,
+          }}
+        >
+          <div
+            style={{
+              width: `${Math.min(pct, 100)}%`,
+              background: soldOut
+                ? "#ef4444"
+                : "linear-gradient(90deg, #a855f7, #ec4899)",
+              height: "100%",
+              borderRadius: 4,
+              transition: "width 0.5s ease",
+            }}
+          />
+        </div>
+
+        <button className="fd-buy-btn" disabled={soldOut}>
+          {soldOut ? "Sold Out" : `Buy Now — ${drop.price}`}
+        </button>
+
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 10,
+            fontSize: 11,
+            color: "#444",
+          }}
+        >
+          &#x1F517; Share Blink → paste anywhere on X
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MyDropCard ───────────────────────────────────────────────────────────────
+
+function MyDropCard({ drop }: { drop: MyDrop }) {
+  const soldOut = drop.claimed >= drop.editions;
+
+  return (
+    <div className="fd-card">
+      {/* Art preview */}
+      <div
+        style={{
+          height: 160,
+          background: `linear-gradient(135deg, ${drop.gradient[0]}, ${drop.gradient[1]})`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 56,
+          position: "relative",
+        }}
+      >
+        {drop.emoji}
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            background: soldOut
+              ? "rgba(239,68,68,0.12)"
+              : "rgba(168,85,247,0.12)",
+            color: soldOut ? "#ef4444" : "#a855f7",
+            padding: "4px 10px",
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 700,
+            border: `1px solid ${soldOut ? "rgba(239,68,68,0.25)" : "rgba(168,85,247,0.25)"}`,
+          }}
+        >
+          {soldOut ? "SOLD OUT" : "LIVE"}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: 16 }}>
+        <div
+          style={{
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 800,
+            fontSize: 16,
+            marginBottom: 4,
+          }}
+        >
+          {drop.title}
+        </div>
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 14 }}>
+          {drop.claimed} of {drop.editions} editions sold
+        </div>
+
+        <div
+          style={{
+            background: "#1a1a2e",
+            borderRadius: 10,
+            padding: 12,
+            marginBottom: 14,
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, color: "#666" }}>Earned</div>
+            <div style={{ fontWeight: 700, color: "#4ade80", fontSize: 16 }}>
+              {drop.earned}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#666" }}>Price / edition</div>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>{drop.price}</div>
+          </div>
+        </div>
+
+        <button className="fd-copy-btn">Copy Blink Link &#x1F517;</button>
+      </div>
     </div>
   );
 }
@@ -191,148 +345,144 @@ function BountyCard({ bounty }: { bounty: Bounty }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [activeFilter, setActiveFilter] = useState<FilterTab>("All");
-  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"live" | "mine">("live");
+  const [drops, setDrops] = useState<Drop[]>(INITIAL_DROPS);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const filtered = BOUNTIES.filter((b) => {
-    const matchesStatus = activeFilter === "All" || b.status === activeFilter;
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q || b.title.toLowerCase().includes(q) || b.description.toLowerCase().includes(q);
-    return matchesStatus && matchesSearch;
-  });
+  // Tick down secondsLeft for live drops
+  useEffect(() => {
+    tickRef.current = setInterval(() => {
+      setDrops((prev) =>
+        prev.map((d) =>
+          d.secondsLeft > 0 ? { ...d, secondsLeft: d.secondsLeft - 1 } : d
+        )
+      );
+    }, 1000);
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+    };
+  }, []);
 
-  const countFor = (tab: FilterTab) =>
-    tab === "All" ? BOUNTIES.length : BOUNTIES.filter((b) => b.status === tab).length;
-
-  const totalSol = BOUNTIES.filter((b) => b.status === "Open" && b.reward.includes("SOL"))
-    .reduce((sum, b) => sum + parseFloat(b.reward), 0)
-    .toFixed(1);
+  const liveCount = drops.filter(
+    (d) => d.secondsLeft > 0 && d.claimed < d.editions
+  ).length;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
-      {/* ── Header ── */}
+    <div style={{ minHeight: "calc(100vh - 64px)", background: "#0a0a0f" }}>
+      {/* ── Tabs ── */}
       <div
         style={{
           display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "1rem",
+          gap: 32,
+          padding: "0 32px",
+          borderBottom: "1px solid #1a1a2e",
         }}
       >
-        <div>
-          <h1
-            style={{
-              fontSize: "1.9rem",
-              fontWeight: 800,
-              background: "linear-gradient(135deg, #9945ff, #14f195)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              marginBottom: "0.35rem",
-              lineHeight: 1.2,
-            }}
-          >
-            Blink Bounties
-          </h1>
-          <p style={{ color: "#64748b", fontSize: "0.9rem", margin: 0 }}>
-            {BOUNTIES.filter((b) => b.status === "Open").length} open bounties &middot;{" "}
-            {totalSol} SOL available
-          </p>
-        </div>
-        <Link
-          href="/create"
-          style={{
-            background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-            color: "#fff",
-            padding: "0.65rem 1.5rem",
-            borderRadius: 10,
-            fontWeight: 700,
-            fontSize: "0.9rem",
-            whiteSpace: "nowrap",
-            alignSelf: "center",
-          }}
+        <button
+          className={`fd-tab${tab === "live" ? " active" : ""}`}
+          onClick={() => setTab("live")}
         >
-          + Post a Bounty
-        </Link>
-      </div>
-
-      {/* ── Filter + Search bar ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.6rem",
-          flexWrap: "wrap",
-        }}
-      >
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab}
-            className={`mp-filter-tab${activeFilter === tab ? " active" : ""}`}
-            onClick={() => setActiveFilter(tab)}
-          >
-            {tab}
+          &#x1F525; Live Drops
+          {liveCount > 0 && (
             <span
               style={{
-                marginLeft: "0.35rem",
-                background: activeFilter === tab ? "#3d2a6e" : "#1e2130",
-                color: activeFilter === tab ? "#c4b5fd" : "#64748b",
+                marginLeft: 6,
+                background: "rgba(168,85,247,0.15)",
+                color: "#a855f7",
                 borderRadius: 999,
-                padding: "0 0.45rem",
+                padding: "0 7px",
                 fontSize: "0.72rem",
                 fontWeight: 700,
               }}
             >
-              {countFor(tab)}
+              {liveCount}
             </span>
-          </button>
-        ))}
-
-        <input
-          type="text"
-          placeholder="Search bounties..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            marginLeft: "auto",
-            background: "#1a1d27",
-            border: "1px solid #2a2d3a",
-            borderRadius: 999,
-            padding: "0.45rem 1rem",
-            color: "#e8eaed",
-            fontSize: "0.82rem",
-            outline: "none",
-            width: 200,
-          }}
-        />
+          )}
+        </button>
+        <button
+          className={`fd-tab${tab === "mine" ? " active" : ""}`}
+          onClick={() => setTab("mine")}
+        >
+          &#x1F3A8; My Drops
+        </button>
       </div>
 
-      {/* ── Grid ── */}
-      {filtered.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "4rem 2rem",
-            color: "#64748b",
-            fontSize: "0.95rem",
-          }}
-        >
-          No bounties match your search.
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-            gap: "1.1rem",
-          }}
-        >
-          {filtered.map((b) => (
-            <BountyCard key={b.id} bounty={b} />
-          ))}
-        </div>
-      )}
+      {/* ── Content ── */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px" }}>
+        {tab === "live" && (
+          <>
+            {/* Section header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 24,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: "'Syne', sans-serif",
+                    fontSize: 20,
+                    fontWeight: 800,
+                  }}
+                >
+                  Live Right Now
+                </div>
+                <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+                  Click any drop to claim — before it&apos;s gone
+                </div>
+              </div>
+              <button className="fd-outline-btn">+ Post a Drop</button>
+            </div>
+
+            {/* Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 20,
+              }}
+            >
+              {drops.map((d) => (
+                <LiveDropCard key={d.id} drop={d} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {tab === "mine" && (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <div
+                style={{
+                  fontFamily: "'Syne', sans-serif",
+                  fontSize: 20,
+                  fontWeight: 800,
+                }}
+              >
+                My Drops
+              </div>
+              <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+                Your published artwork and earnings
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 20,
+              }}
+            >
+              {MY_DROPS.map((d) => (
+                <MyDropCard key={d.id} drop={d} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
